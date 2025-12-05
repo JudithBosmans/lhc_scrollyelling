@@ -1,0 +1,49 @@
+h1 {
+    color: white;
+    font-size: 270px;
+    font-weight: 700;
+
+    margin: 0;
+
+    text-align: center;
+    display: relative;
+
+    font-family: "Inter", sans-serif;
+    font-weight: 900;
+    line-height: 0.9;
+}
+
+p {
+    color: white;
+
+    font-size: 24px;
+    font-weight: 200;
+
+    line-height: 1.5;
+    font-family: "Inter", sans-serif;
+    text-align: left;
+
+    margin: 0;
+}
+
+.text {
+    &Container {
+        &Home {
+            &Cont {
+                display: flex;
+                flex-direction: column;
+                gap: 25px;
+            }
+
+            strong {
+                text-align: left;
+                font-size: 48px;
+            }
+
+            p {
+                text-align: right;
+                max-width: 800px;
+            }
+        }
+    }
+}
