@@ -1,15 +1,13 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, useAnimations } from "@react-three/drei";
 import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-// Belgium coordinates converted to 3D position (lat: 50.5°N, lon: 4.5°E)
 const BELGIUM_LAT = 50.5;
 const BELGIUM_LON = 4.5;
 
-// Convert lat/lon to 3D vector pointing at that location on sphere
 function latLonToVector3(lat: number, lon: number, radius: number = 1) {
     const phi = (90 - lat) * (Math.PI / 180);
     const theta = (lon + 180) * (Math.PI / 180);
@@ -20,7 +18,6 @@ function EarthModel({ scrollProgress }: { scrollProgress: number }) {
     const { scene } = useGLTF("/3D_assets/earth.glb");
     const groupRef = useRef<THREE.Group>(null);
 
-    // Remove reflections
     useEffect(() => {
         scene.traverse((child) => {
             if (child instanceof THREE.Mesh && child.material) {
@@ -31,11 +28,17 @@ function EarthModel({ scrollProgress }: { scrollProgress: number }) {
         });
     }, [scene]);
 
-    // Rotate globe to show Belgium
     useFrame(() => {
         if (!groupRef.current) return;
-        const targetRotationY = scrollProgress * -0.3; // Rotate to show Belgium
+        // Phase 1: Rotate to Belgium
+        const rotationProgress = Math.min(scrollProgress, 1);
+        const targetRotationY = rotationProgress * -0.3;
         groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRotationY, 0.1);
+
+        // Phase 2: Move globe down (exit animation)
+        const exitProgress = Math.max(0, scrollProgress - 1);
+        const targetY = exitProgress * -2.3;
+        groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, targetY, 0.1);
     });
 
     return (
@@ -45,15 +48,59 @@ function EarthModel({ scrollProgress }: { scrollProgress: number }) {
     );
 }
 
-// Camera controller that zooms based on scroll progress
+// Hubble model with textures and animation
+function HubbleModel({ scrollProgress }: { scrollProgress: number }) {
+    const group = useRef<THREE.Group>(null);
+    const { scene, animations } = useGLTF("/3D_assets/HUBBLE.glb");
+    const { actions } = useAnimations(animations, group);
+
+    // Play animation when model loads
+    useEffect(() => {
+        if (actions && Object.keys(actions).length > 0) {
+            const firstAction = actions[Object.keys(actions)[0]];
+            if (firstAction) {
+                firstAction.reset().play();
+            }
+        }
+    }, [actions]);
+
+    // Hubble fades in and rotates slowly
+    useFrame(() => {
+        if (!group.current) return;
+        group.current.rotation.y += 0.002;
+
+        // Fade in: opacity based on scroll (appears after progress > 1.5)
+        const hubbleProgress = Math.max(0, Math.min(1, (scrollProgress - 1.5) / 0.5));
+        group.current.visible = hubbleProgress > 0;
+    });
+
+    return (
+        <group ref={group} visible={false} position={[1.4, 0.3, 0]}>
+            <primitive object={scene} scale={0.1} />
+        </group>
+    );
+}
+
 function CameraController({ scrollProgress }: { scrollProgress: number }) {
     const { camera } = useThree();
     const belgiumPos = latLonToVector3(BELGIUM_LAT, BELGIUM_LON, 2.2);
 
     useFrame(() => {
+        // Phase 1: Zoom to Belgium (0-1)
+        const zoomProgress = Math.min(scrollProgress, 1);
         const startPos = new THREE.Vector3(0, 0, 5);
-        const endPos = belgiumPos;
-        camera.position.lerpVectors(startPos, endPos, scrollProgress * 0.8);
+
+        // Phase 1: Zoom to Belgium
+        if (scrollProgress <= 1) {
+            camera.position.lerpVectors(startPos, belgiumPos, zoomProgress * 0.8);
+        }
+        // Phase 2-3: Gradually move camera back for Hubble view
+        else {
+            const hubbleProgress = Math.min(1, (scrollProgress - 1) / 1);
+            const hubbleViewPos = new THREE.Vector3(0, 0, 4);
+            camera.position.lerpVectors(belgiumPos, hubbleViewPos, hubbleProgress);
+        }
+
         camera.lookAt(0, 0, 0);
     });
 
@@ -73,43 +120,53 @@ export default function Earth3D() {
     const [scrollProgress, setScrollProgress] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Track scroll progress within this section
     useEffect(() => {
         const handleScroll = () => {
             if (!containerRef.current) return;
             const rect = containerRef.current.getBoundingClientRect();
             const windowHeight = window.innerHeight;
-            // Calculate progress: 0 when section enters, 1 when fully scrolled
-            const progress = Math.max(0, Math.min(1, -rect.top / windowHeight));
+            // Progress 0-2: phase 1 (0-1) zoom, phase 2 (1-2) exit
+            const progress = Math.max(0, Math.min(2, -rect.top / windowHeight));
             setScrollProgress(progress);
         };
         window.addEventListener("scroll", handleScroll, { passive: true });
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
+    // Earth text: appears at 60%, fades at progress 1-1.3
+    const earthTextAppear = Math.max(0, Math.min(1, (scrollProgress - 0.6) / 0.4));
+    const earthTextFade = scrollProgress > 1 ? Math.max(0, 1 - (scrollProgress - 1) / 0.3) : 1;
+    const earthTextOpacity = earthTextAppear * earthTextFade;
+
+    // Hubble text: appears at progress 1.5-2
+    const hubbleTextOpacity = Math.max(0, Math.min(1, (scrollProgress - 1.5) / 0.5));
+
     return (
-        <div ref={containerRef} style={{ width: "100vw", height: "200vh", background: "#000", position: "relative" }}>
+        <div ref={containerRef} style={{ width: "100vw", height: "400vh", background: "#000", position: "relative" }}>
             <div style={{ position: "sticky", top: 0, width: "100vw", height: "100vh" }}>
                 <Canvas style={{ position: "absolute", top: 0, left: 0 }} camera={{ position: [0, 0, 5], fov: 45 }}>
-                    <ambientLight intensity={4} />
-                    <directionalLight position={[5, 3, 5]} intensity={0.8} />
-                    <directionalLight position={[-5, -3, -5]} intensity={0.6} />
+                    <ambientLight intensity={2} />
+                    <directionalLight position={[5, 3, 5]} intensity={1} />
+                    <directionalLight position={[-5, -3, -5]} intensity={0.5} />
+                    <pointLight position={[0, 5, 0]} intensity={0.5} />
 
                     <CameraController scrollProgress={scrollProgress} />
 
                     <Suspense fallback={<Loader />}>
                         <EarthModel scrollProgress={scrollProgress} />
+                        <HubbleModel scrollProgress={scrollProgress} />
                     </Suspense>
                 </Canvas>
 
-                <div className="text textContainer textContainerHome">
+                {/* Earth text */}
+                <div className="text textContainer textContainerHome" style={{ pointerEvents: earthTextOpacity > 0 ? "auto" : "none" }}>
                     <p
                         style={{
                             position: "absolute",
                             top: "15%",
                             left: "5%",
-                            opacity: Math.max(0, (scrollProgress - 0.6) / 0.4),
-                            transition: "opacity 0.3s ease",
+                            opacity: earthTextOpacity,
+                            transition: "opacity 0.2s ease",
                         }}
                     >
                         <strong>Let&apos;s zoom in on Belgium.</strong>
@@ -120,15 +177,43 @@ export default function Earth3D() {
                             position: "absolute",
                             bottom: "15%",
                             right: "5%",
-                            opacity: Math.max(0, (scrollProgress - 0.6) / 0.4),
-                            transition: "opacity 0.3s ease",
+                            opacity: earthTextOpacity,
+                            transition: "opacity 0.2s ease",
                         }}
                     >
-                        <p>The Einstein Telescope may be built in Belgium. A triangular underground observatory that listens to the Universe.</p>{" "}
+                        <p>The Einstein Telescope may be built in Belgium. A triangular underground observatory that listens to the Universe.</p>
                         <p>
                             It can detect black holes, neutron stars — even signals from the Big Bang. So sensitive, it reaches back to the early moments of time. A cosmic time machine under Belgian
                             soil.
                         </p>
+                    </div>
+                </div>
+
+                {/* Hubble text */}
+                <div className="text textContainer textContainerHome" style={{ pointerEvents: hubbleTextOpacity > 0 ? "auto" : "none" }}>
+                    <p
+                        style={{
+                            position: "absolute",
+                            top: "10%",
+                            left: "5%",
+                            opacity: hubbleTextOpacity,
+                            transition: "opacity 0.3s ease",
+                        }}
+                    >
+                        <strong>HUBBLE</strong>
+                    </p>
+                    <div
+                        className="text textContainer textContainerHome textContainerHomeCont"
+                        style={{
+                            position: "absolute",
+                            bottom: "10%",
+                            right: "5%",
+                            opacity: hubbleTextOpacity,
+                            transition: "opacity 0.3s ease",
+                        }}
+                    >
+                        <p>Circling in our planet's orbit, the Hubble Space Telescope captures the most detailed images of distant galaxies.</p>
+                        <p>It can see light from over 13 billion years ago — nearly to the beginning of the universe itself.</p>
                     </div>
                 </div>
             </div>
@@ -137,3 +222,4 @@ export default function Earth3D() {
 }
 
 useGLTF.preload("/3D_assets/earth.glb");
+useGLTF.preload("/3D_assets/HUBBLE.glb");
