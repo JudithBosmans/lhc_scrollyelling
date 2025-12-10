@@ -13,15 +13,141 @@ h1 {
     line-height: 0.9;
 }
 
+.Container {
+    strong {
+        margin-bottom: 60px;
+    }
+
+    &SubTitle {
+        font-size: 90px;
+        font-weight: 900;
+        font-family: "Inter", sans-serif;
+
+        line-height: 0.9;
+        text-align: left;
+
+        margin-bottom: 20px;
+
+        &Small {
+            @extend .ContainerSubTitle;
+            font-size: 50px;
+            max-width: 350px !important;
+            line-height: 1.1;
+        }
+    }
+
+    &Text {
+        max-width: 500px !important;
+    }
+
+    &Summary {
+        display: flex;
+        flex-direction: column;
+
+        gap: 18px;
+        margin-top: 70px;
+
+        strong {
+            font-size: 34px;
+            font-weight: 200;
+        }
+
+        &Item {
+            flex-direction: column;
+        }
+
+        &Image {
+            position: absolute;
+            bottom: 5%;
+            left: 25%;
+            cursor: pointer;
+
+            img {
+                transition: opacity 0.3s ease;
+            }
+
+            .overlay {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                text-align: left;
+
+                opacity: 0;
+                transition: opacity 0.3s ease;
+                background: rgba(0, 0, 0, 0.7);
+                color: white;
+
+                padding: 8px 12px;
+
+                font-size: 16px;
+                font-weight: 200;
+                line-height: 1.5;
+
+                font-family: "Inter", sans-serif;
+                letter-spacing: 0.8px;
+            }
+
+            &:hover {
+                img {
+                    opacity: 0.7;
+                }
+                .overlay {
+                    opacity: 1;
+                }
+            }
+        }
+
+        &Image2 {
+            position: absolute;
+            bottom: 18%;
+            right: 10%;
+            cursor: pointer;
+
+            img {
+                transition: opacity 0.3s ease;
+            }
+
+            .overlay {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                text-align: left;
+
+                opacity: 0;
+                transition: opacity 0.3s ease;
+                background: rgba(0, 0, 0, 0.7);
+                color: white;
+
+                padding: 8px 12px;
+
+                font-size: 16px;
+                font-weight: 200;
+                line-height: 1.5;
+
+                font-family: "Inter", sans-serif;
+                letter-spacing: 0.8px;
+            }
+
+            &:hover {
+                img {
+                    opacity: 0.7;
+                }
+                .overlay {
+                    opacity: 1;
+                }
+            }
+        }
+    }
+}
+
 p {
     color: white;
 
-    font-size: 24px;
+    font-size: 18px;
     font-weight: 200;
 
     line-height: 1.5;
     font-family: "Inter", sans-serif;
-    text-align: left;
 
     margin: 0;
 }
@@ -33,15 +159,18 @@ p {
                 display: flex;
                 flex-direction: column;
                 gap: 25px;
+
+                &Right {
+                    text-align: right;
+                }
             }
 
             strong {
                 text-align: left;
-                font-size: 48px;
+                color: white;
             }
 
             p {
-                text-align: right;
                 max-width: 800px;
             }
         }

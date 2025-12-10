@@ -4,6 +4,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import Image from "next/image";
 
 const BELGIUM_LAT = 50.5;
 const BELGIUM_LON = 4.5;
@@ -75,7 +76,7 @@ function HubbleModel({ scrollProgress }: { scrollProgress: number }) {
     });
 
     return (
-        <group ref={group} visible={false} position={[1.4, 0.3, 0]}>
+        <group ref={group} visible={false} position={[1, 0.7, 0]}>
             <primitive object={scene} scale={0.1} />
         </group>
     );
@@ -83,22 +84,20 @@ function HubbleModel({ scrollProgress }: { scrollProgress: number }) {
 
 function CameraController({ scrollProgress }: { scrollProgress: number }) {
     const { camera } = useThree();
+    const startPos = new THREE.Vector3(0, 0, 5);
     const belgiumPos = latLonToVector3(BELGIUM_LAT, BELGIUM_LON, 2.2);
+    // End position of phase 1 (80% toward Belgium)
+    const phase1EndPos = new THREE.Vector3().lerpVectors(startPos, belgiumPos, 0.8);
+    const hubbleViewPos = new THREE.Vector3(0, 0, 4);
 
     useFrame(() => {
-        // Phase 1: Zoom to Belgium (0-1)
-        const zoomProgress = Math.min(scrollProgress, 1);
-        const startPos = new THREE.Vector3(0, 0, 5);
-
-        // Phase 1: Zoom to Belgium
         if (scrollProgress <= 1) {
-            camera.position.lerpVectors(startPos, belgiumPos, zoomProgress * 0.8);
-        }
-        // Phase 2-3: Gradually move camera back for Hubble view
-        else {
+            // Phase 1: Zoom toward Belgium (0-80% of the way)
+            camera.position.lerpVectors(startPos, belgiumPos, scrollProgress * 0.8);
+        } else {
+            // Phase 2: Smooth transition from phase1EndPos to hubbleViewPos
             const hubbleProgress = Math.min(1, (scrollProgress - 1) / 1);
-            const hubbleViewPos = new THREE.Vector3(0, 0, 4);
-            camera.position.lerpVectors(belgiumPos, hubbleViewPos, hubbleProgress);
+            camera.position.lerpVectors(phase1EndPos, hubbleViewPos, hubbleProgress);
         }
 
         camera.lookAt(0, 0, 0);
@@ -144,7 +143,7 @@ export default function Earth3D() {
     return (
         <div ref={containerRef} style={{ width: "100vw", height: "400vh", background: "#000", position: "relative" }}>
             <div style={{ position: "sticky", top: 0, width: "100vw", height: "100vh" }}>
-                <Canvas style={{ position: "absolute", top: 0, left: 0 }} camera={{ position: [0, 0, 5], fov: 45 }}>
+                <Canvas style={{ position: "absolute", top: 0, left: 0, zIndex: 2, pointerEvents: "none" }} camera={{ position: [0, 0, 5], fov: 45 }}>
                     <ambientLight intensity={2} />
                     <directionalLight position={[5, 3, 5]} intensity={1} />
                     <directionalLight position={[-5, -3, -5]} intensity={0.5} />
@@ -167,7 +166,9 @@ export default function Earth3D() {
                             left: "5%",
                             opacity: earthTextOpacity,
                             transition: "opacity 0.2s ease",
+                            zIndex: 2,
                         }}
+                        className="ContainerSubTitleSmall"
                     >
                         <strong>Let&apos;s zoom in on Belgium.</strong>
                     </p>
@@ -179,6 +180,8 @@ export default function Earth3D() {
                             right: "5%",
                             opacity: earthTextOpacity,
                             transition: "opacity 0.2s ease",
+                            zIndex: 2,
+                            maxWidth: "500px",
                         }}
                     >
                         <p>The Einstein Telescope may be built in Belgium. A triangular underground observatory that listens to the Universe.</p>
@@ -191,29 +194,92 @@ export default function Earth3D() {
 
                 {/* Hubble text */}
                 <div className="text textContainer textContainerHome" style={{ pointerEvents: hubbleTextOpacity > 0 ? "auto" : "none" }}>
-                    <p
+                    <div
+                        className="Container"
                         style={{
                             position: "absolute",
                             top: "10%",
                             left: "5%",
                             opacity: hubbleTextOpacity,
                             transition: "opacity 0.3s ease",
+                            textAlign: "left",
                         }}
                     >
-                        <strong>HUBBLE</strong>
-                    </p>
+                        <div>
+                            <p className="ContainerSubTitle">
+                                <strong>HUBBLE</strong>
+                            </p>
+                            <p className="ContainerText"> Circling in our planet's orbit, the Hubble Space Telescope captures the most detailed images of distant galaxies.</p>
+                        </div>
+
+                        <div className="ContainerSummary">
+                            <div className="ContainerSummaryItem">
+                                <p>can look back</p>
+                                <p>
+                                    <strong>13.4b. light years</strong>
+                                </p>
+                            </div>
+                            <div className="ContainerSummaryItem">
+                                <p>built on</p>
+                                <p>
+                                    <strong>7 years</strong>
+                                </p>
+                            </div>
+                            <div className="ContainerSummaryItem">
+                                <p>distance from earth</p>
+                                <p>
+                                    <strong>483km.</strong>
+                                </p>
+                            </div>
+                            <div className="ContainerSummaryItem">
+                                <p>launched on</p>
+                                <p>
+                                    <strong>April 24, 1990</strong>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                     <div
-                        className="text textContainer textContainerHome textContainerHomeCont"
+                        className="ContainerSummaryImage"
+                        style={{
+                            opacity: hubbleTextOpacity,
+                            transition: "opacity 0.3s ease",
+                            zIndex: 1,
+                        }}
+                    >
+                        <Image src="/images/hubble/galaxies.jpg" alt="Hubble" width={500} height={300} />
+                        <span className="overlay">
+                            Approximately 10,000 galaxies fill a small area of sky called the Hubble Ultra Deep Field. Created through the collaboration of 20 astronomers and scientists, this is the
+                            deepest image of the universe ever made at optical and near-infrared wavelengths. NASA, ESA, S. Beckwith and the HUDF Team (STScI), and B. Mobasher (STScI)
+                        </span>
+                    </div>
+                    <div
+                        className="ContainerSummaryImage2"
+                        style={{
+                            opacity: hubbleTextOpacity,
+                            transition: "opacity 0.3s ease",
+                            zIndex: 1,
+                        }}
+                    >
+                        <Image src="/images/hubble/star-V838.jpg" alt="star-V838" width={500} height={300} />
+                        <span className="overlay">
+                            This Hubble Space Telescope image of the star V838 Monocerotis reveals dramatic changes in the illumination of surrounding dusty cloud structures. The effect, called a
+                            light echo, unveiled never-before-seen dust patterns when the star suddenly brightened for several weeks in early 2002. NASA, ESA, and The Hubble Heritage Team (STScI/AURA)
+                        </span>
+                    </div>
+                    <div
+                        className="text textContainer textContainerHome textContainerHomeCont textContainerHomeContRight"
                         style={{
                             position: "absolute",
                             bottom: "10%",
                             right: "5%",
                             opacity: hubbleTextOpacity,
                             transition: "opacity 0.3s ease",
+                            zIndex: 2,
                         }}
                     >
-                        <p>Circling in our planet's orbit, the Hubble Space Telescope captures the most detailed images of distant galaxies.</p>
-                        <p>It can see light from over 13 billion years ago — nearly to the beginning of the universe itself.</p>
+                        <p className="ContainerText">Circling in our planet's orbit, the Hubble Space Telescope captures the most detailed images of distant galaxies.</p>
+                        <p className="ContainerText">It can see light from over 13 billion years ago — nearly to the beginning of the universe itself.</p>
                     </div>
                 </div>
             </div>
