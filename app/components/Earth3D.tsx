@@ -209,7 +209,7 @@ export default function Earth3D() {
                             <p className="ContainerSubTitle">
                                 <strong>HUBBLE</strong>
                             </p>
-                            <p className="ContainerText"> Circling in our planet's orbit, the Hubble Space Telescope captures the most detailed images of distant galaxies.</p>
+                            <p className="ContainerText"> Circling in our planet&apos;s orbit, the Hubble Space Telescope captures the most detailed images of distant galaxies.</p>
                         </div>
 
                         <div className="ContainerSummary">
@@ -278,7 +278,7 @@ export default function Earth3D() {
                             zIndex: 2,
                         }}
                     >
-                        <p className="ContainerText">Circling in our planet's orbit, the Hubble Space Telescope captures the most detailed images of distant galaxies.</p>
+                        <p className="ContainerText">Circling in our planet&apos;s orbit, the Hubble Space Telescope captures the most detailed images of distant galaxies.</p>
                         <p className="ContainerText">It can see light from over 13 billion years ago — nearly to the beginning of the universe itself.</p>
                     </div>
                 </div>
