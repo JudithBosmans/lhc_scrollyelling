@@ -55,7 +55,6 @@ function HubbleModel({ scrollProgress }: { scrollProgress: number }) {
     const { scene, animations } = useGLTF("/3D_assets/HUBBLE.glb");
     const { actions } = useAnimations(animations, group);
 
-    // Play animation when model loads
     useEffect(() => {
         if (actions && Object.keys(actions).length > 0) {
             const firstAction = actions[Object.keys(actions)[0]];
@@ -65,19 +64,54 @@ function HubbleModel({ scrollProgress }: { scrollProgress: number }) {
         }
     }, [actions]);
 
-    // Hubble fades in and rotates slowly
+    // Hubble appears at 1.5, exits at 2-2.5
     useFrame(() => {
         if (!group.current) return;
         group.current.rotation.y += 0.002;
 
-        // Fade in: opacity based on scroll (appears after progress > 1.5)
-        const hubbleProgress = Math.max(0, Math.min(1, (scrollProgress - 1.5) / 0.5));
-        group.current.visible = hubbleProgress > 0;
+        const fadeIn = Math.max(0, Math.min(1, (scrollProgress - 1.5) / 0.5));
+        const fadeOut = scrollProgress > 2 ? Math.max(0, 1 - (scrollProgress - 2) / 0.5) : 1;
+        group.current.visible = fadeIn * fadeOut > 0;
+
+        // Exit animation: move up and out
+        const exitProgress = Math.max(0, (scrollProgress - 2) / 0.5);
+        group.current.position.y = 0.7 + exitProgress * 3;
     });
 
     return (
         <group ref={group} visible={false} position={[1, 0.7, 0]}>
             <primitive object={scene} scale={0.1} />
+        </group>
+    );
+}
+
+// Chandra model - appears after Hubble exits
+function ChandraModel({ scrollProgress }: { scrollProgress: number }) {
+    const group = useRef<THREE.Group>(null);
+    const { scene, animations } = useGLTF("/3D_assets/chandra.glb");
+    const { actions } = useAnimations(animations, group);
+
+    useEffect(() => {
+        if (actions && Object.keys(actions).length > 0) {
+            const firstAction = actions[Object.keys(actions)[0]];
+            if (firstAction) {
+                firstAction.reset().play();
+            }
+        }
+    }, [actions]);
+
+    // Chandra appears at progress 4.5-5
+    useFrame(() => {
+        if (!group.current) return;
+        group.current.rotation.y += 0.002;
+
+        const chandraProgress = Math.max(0, Math.min(1, (scrollProgress - 4.5) / 0.5));
+        group.current.visible = chandraProgress > 0;
+    });
+
+    return (
+        <group ref={group} visible={false} position={[1, 0.7, 0]}>
+            <primitive object={scene} scale={0.004} />
         </group>
     );
 }
@@ -124,24 +158,34 @@ export default function Earth3D() {
             if (!containerRef.current) return;
             const rect = containerRef.current.getBoundingClientRect();
             const windowHeight = window.innerHeight;
-            // Progress 0-2: phase 1 (0-1) zoom, phase 2 (1-2) exit
-            const progress = Math.max(0, Math.min(2, -rect.top / windowHeight));
+            // Progress 0-5: each unit = 100vh scroll
+            const progress = Math.max(0, Math.min(5, -rect.top / windowHeight));
             setScrollProgress(progress);
         };
         window.addEventListener("scroll", handleScroll, { passive: true });
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
+    // Intro text: appears early (0.1-0.3), fades before earth zoom text (0.4-0.55)
+    const introTextAppear = Math.max(0, Math.min(1, (scrollProgress - 0.1) / 0.2));
+    const introTextFade = scrollProgress > 0.4 ? Math.max(0, 1 - (scrollProgress - 0.4) / 0.15) : 1;
+    const introTextOpacity = introTextAppear * introTextFade;
+
     // Earth text: appears at 60%, fades at progress 1-1.3
     const earthTextAppear = Math.max(0, Math.min(1, (scrollProgress - 0.6) / 0.4));
     const earthTextFade = scrollProgress > 1 ? Math.max(0, 1 - (scrollProgress - 1) / 0.3) : 1;
     const earthTextOpacity = earthTextAppear * earthTextFade;
 
-    // Hubble text: appears at progress 1.5-2
-    const hubbleTextOpacity = Math.max(0, Math.min(1, (scrollProgress - 1.5) / 0.5));
+    // Hubble text: appears at 1.5-2, fades at 2-2.5
+    const hubbleTextAppear = Math.max(0, Math.min(1, (scrollProgress - 1.5) / 0.5));
+    const hubbleTextFade = scrollProgress > 2 ? Math.max(0, 1 - (scrollProgress - 2) / 0.5) : 1;
+    const hubbleTextOpacity = hubbleTextAppear * hubbleTextFade;
+
+    // Chandra text: appears at 4.5-5 (~4 seconds after Hubble fades)
+    const chandraTextOpacity = Math.max(0, Math.min(1, (scrollProgress - 4.5) / 0.5));
 
     return (
-        <div ref={containerRef} style={{ width: "100vw", height: "400vh", background: "#000", position: "relative" }}>
+        <div ref={containerRef} style={{ width: "100vw", height: "600vh", background: "#000", position: "relative" }}>
             <div style={{ position: "sticky", top: 0, width: "100vw", height: "100vh" }}>
                 <Canvas style={{ position: "absolute", top: 0, left: 0, zIndex: 2, pointerEvents: "none" }} camera={{ position: [0, 0, 5], fov: 45 }}>
                     <ambientLight intensity={2} />
@@ -154,41 +198,116 @@ export default function Earth3D() {
                     <Suspense fallback={<Loader />}>
                         <EarthModel scrollProgress={scrollProgress} />
                         <HubbleModel scrollProgress={scrollProgress} />
+                        <ChandraModel scrollProgress={scrollProgress} />
                     </Suspense>
                 </Canvas>
 
-                {/* Earth text */}
+                {/* Intro text - appears right after scrolling from title, before earth zoom */}
+                <div
+                    className="introText"
+                    style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        opacity: introTextOpacity,
+                        transition: "opacity 0.3s ease",
+                        zIndex: 3,
+                        pointerEvents: introTextOpacity > 0 ? "auto" : "none",
+                        textAlign: "center",
+                        maxWidth: "700px",
+                    }}
+                >
+                    <p className="introTextTitle" style={{ fontSize: "32px", fontWeight: 700, marginBottom: "20px", letterSpacing: "2px" }}>
+                        BEYOND LIGHT
+                    </p>
+                    <p style={{ fontSize: "20px", lineHeight: 1.6, fontWeight: 300 }}>
+                        To look far into the universe is to look far back in time. This project explores how different instruments, from optical telescopes to the Einstein Telescope, extend our
+                        ability to detect signals from the universe&apos;s earliest moments.{" "}
+                    </p>
+                </div>
+
+                {/* Earth text  */}
                 <div className="text textContainer textContainerHome" style={{ pointerEvents: earthTextOpacity > 0 ? "auto" : "none" }}>
-                    <p
+                    <div
+                        className="Container"
                         style={{
                             position: "absolute",
-                            top: "15%",
+                            top: "10%",
                             left: "5%",
                             opacity: earthTextOpacity,
-                            transition: "opacity 0.2s ease",
+                            transition: "opacity 0.3s ease",
+                            textAlign: "left",
                             zIndex: 2,
                         }}
-                        className="ContainerSubTitleSmall"
                     >
-                        <strong>Let&apos;s zoom in on Belgium.</strong>
-                    </p>
+                        <div>
+                            <p className="ContainerSubTitle">
+                                <strong>EINSTEIN TELESCOPE</strong>
+                            </p>
+                            <p className="ContainerText">
+                                The underground Einstein Telescope will be Europe&apos;s most advanced observatory for gravitational waves. It will allow researchers to hear black holes collide and
+                                learn about the early universe. The Netherlands, Belgium and Germany are jointly studying whether to host this world-class observatory.
+                            </p>
+                        </div>
+
+                        <div className="ContainerSummary">
+                            <div className="ContainerSummaryItem">
+                                <p>should look back</p>
+                                <p>
+                                    <strong>13.8b. years</strong>
+                                </p>
+                            </div>
+                            <div className="ContainerSummaryItem">
+                                <p>distance from earth</p>
+                                <p>
+                                    <strong>-10km</strong>
+                                </p>
+                            </div>
+                            <div className="ContainerSummaryItem">
+                                <p>estimate building time</p>
+                                <p>
+                                    <strong>+- 17 years</strong>
+                                </p>
+                            </div>
+                            <div className="ContainerSummaryItem">
+                                <p>to be built on</p>
+                                <p>
+                                    <strong>2028</strong>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                     <div
-                        className="text textContainer textContainerHome textContainerHomeCont"
+                        className="Container"
                         style={{
                             position: "absolute",
-                            bottom: "15%",
-                            right: "5%",
+                            bottom: "7%",
+                            right: "8%",
                             opacity: earthTextOpacity,
-                            transition: "opacity 0.2s ease",
+                            transition: "opacity 0.3s ease",
+                            textAlign: "right",
                             zIndex: 2,
-                            maxWidth: "500px",
+                            maxWidth: "700px",
                         }}
                     >
-                        <p>The Einstein Telescope may be built in Belgium. A triangular underground observatory that listens to the Universe.</p>
-                        <p>
-                            It can detect black holes, neutron stars — even signals from the Big Bang. So sensitive, it reaches back to the early moments of time. A cosmic time machine under Belgian
-                            soil.
-                        </p>
+                        <div>
+                            <p className="Container">
+                                The soil in which the underground Einstein Telescope will be built partly determines its accuracy. The less vibrations it passes through, the less interference for the
+                                measuring equipment. The hard surface combined with the soft, cushioning top layer seems ideally suited for the Einstein Telescope. The peace and quiet of the area
+                                makes the border area a suitable site for the Einstein Telescope.
+                            </p>
+                        </div>
+                    </div>
+                    <div
+                        className="ContainerSummaryImage3"
+                        style={{
+                            opacity: earthTextOpacity,
+                            transition: "opacity 0.3s ease",
+                            zIndex: 2,
+                        }}
+                    >
+                        <Image src="/images/hubble/ET.png" alt="Einstein" width={650} height={400} />
                     </div>
                 </div>
 
@@ -220,7 +339,7 @@ export default function Earth3D() {
                                 </p>
                             </div>
                             <div className="ContainerSummaryItem">
-                                <p>built on</p>
+                                <p>built in</p>
                                 <p>
                                     <strong>7 years</strong>
                                 </p>
@@ -282,6 +401,94 @@ export default function Earth3D() {
                         <p className="ContainerText">It can see light from over 13 billion years ago — nearly to the beginning of the universe itself.</p>
                     </div>
                 </div>
+
+                {/* Chandra text - same layout as Hubble */}
+                <div className="text textContainer textContainerHome" style={{ pointerEvents: chandraTextOpacity > 0 ? "auto" : "none" }}>
+                    <div
+                        className="Container"
+                        style={{
+                            position: "absolute",
+                            top: "10%",
+                            left: "5%",
+                            opacity: chandraTextOpacity,
+                            transition: "opacity 0.3s ease",
+                            textAlign: "left",
+                        }}
+                    >
+                        <div>
+                            <p className="ContainerSubTitle">
+                                <strong>CHANDRA X-RAY OBSERVATORY</strong>
+                            </p>
+                            <p className="ContainerText">
+                                The Chandra X-ray Observatory is the world's most powerful X-ray telescope. It has eight-times greater resolution and is able to detect sources more than 20-times
+                                fainter than any previous X-ray telescope
+                            </p>
+                        </div>
+
+                        <div className="ContainerSummary">
+                            <div className="ContainerSummaryItem">
+                                <p>can look back</p>
+                                <p>
+                                    <strong>10b. light years</strong>
+                                </p>
+                            </div>
+                            <div className="ContainerSummaryItem">
+                                <p>built in</p>
+                                <p>
+                                    <strong>xxx</strong>
+                                </p>
+                            </div>
+                            <div className="ContainerSummaryItem">
+                                <p>distance from earth</p>
+                                <p>
+                                    <strong>139,000km.</strong>
+                                </p>
+                            </div>
+                            <div className="ContainerSummaryItem">
+                                <p>launched on</p>
+                                <p>
+                                    <strong>July 23, 1999</strong>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                        className="ContainerSummaryImage"
+                        style={{
+                            opacity: chandraTextOpacity,
+                            transition: "opacity 0.3s ease",
+                            zIndex: 1,
+                        }}
+                    >
+                        <Image src="/images/hubble/galaxies.jpg" alt="Chandra" width={500} height={300} />
+                        <span className="overlay">Placeholder image - replace with Chandra X-ray imagery.</span>
+                    </div>
+                    <div
+                        className="ContainerSummaryImage2"
+                        style={{
+                            opacity: chandraTextOpacity,
+                            transition: "opacity 0.3s ease",
+                            zIndex: 1,
+                        }}
+                    >
+                        <Image src="/images/hubble/star-V838.jpg" alt="Chandra observation" width={500} height={300} />
+                        <span className="overlay">Placeholder image - replace with Chandra X-ray imagery.</span>
+                    </div>
+                    <div
+                        className="text textContainer textContainerHome textContainerHomeCont textContainerHomeContRight"
+                        style={{
+                            position: "absolute",
+                            bottom: "10%",
+                            right: "5%",
+                            opacity: chandraTextOpacity,
+                            transition: "opacity 0.3s ease",
+                            zIndex: 2,
+                        }}
+                    >
+                        <p className="ContainerText">Chandra observes X-rays from high-energy regions of the universe — black holes, supernovas, and dark matter.</p>
+                        <p className="ContainerText">Its highly elliptical orbit takes it one-third of the way to the Moon, allowing long uninterrupted observations.</p>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -289,3 +496,4 @@ export default function Earth3D() {
 
 useGLTF.preload("/3D_assets/earth.glb");
 useGLTF.preload("/3D_assets/HUBBLE.glb");
+useGLTF.preload("/3D_assets/chandra.glb");
